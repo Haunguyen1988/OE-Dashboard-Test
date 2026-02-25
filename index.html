@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vietjet Air OMC</title>
+    <script>
+      // Fix for "Uncaught TypeError: Cannot set property fetch of #<Window> which has only a getter"
+      // This happens when a polyfill tries to overwrite the global fetch which is protected in this environment.
+      (function() {
+        const originalFetch = window.fetch;
+        const setter = function(v) { console.warn('Ignored attempt to overwrite fetch'); };
+        const keys = ['fetch', 'Headers', 'Request', 'Response'];
+        const targets = [window, typeof globalThis !== 'undefined' ? globalThis : null, typeof self !== 'undefined' ? self : null].filter(Boolean);
+        
+        targets.forEach(target => {
+          keys.forEach(key => {
+            try {
+              const original = target[key];
+              if (original) {
+                Object.defineProperty(target, key, {
+                  get: function() { return original; },
+                  set: setter,
+                  configurable: true,
+                  enumerable: true
+                });
+              }
+            } catch (e) {
+              // Ignore errors if property is not configurable
+            }
+          });
+        });
+        
+        // Some polyfills use 'global' variable
+        if (typeof window !== 'undefined' && !window.global) {
+          window.global = window;
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

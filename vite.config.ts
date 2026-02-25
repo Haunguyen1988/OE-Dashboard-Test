@@ -1,0 +1,32 @@
+import tailwindcss from '@tailwindcss/vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+import {defineConfig, loadEnv} from 'vite';
+
+export default defineConfig(({mode}) => {
+  const env = loadEnv(mode, '.', '');
+  return {
+    plugins: [react(), tailwindcss()],
+    define: {
+      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+    },
+    resolve: {
+      alias: {
+        '@': path.resolve(__dirname, '.'),
+        'node-fetch': path.resolve(__dirname, 'src/fetch-shim.ts'),
+        'isomorphic-fetch': path.resolve(__dirname, 'src/fetch-shim.ts'),
+        'whatwg-fetch': path.resolve(__dirname, 'src/fetch-shim.ts'),
+        'formdata-polyfill': path.resolve(__dirname, 'src/fetch-shim.ts'),
+        'formdata-polyfill/esm.min.js': path.resolve(__dirname, 'src/fetch-shim.ts'),
+        'fetch-blob': path.resolve(__dirname, 'src/fetch-shim.ts'),
+        'fetch-blob/from.js': path.resolve(__dirname, 'src/fetch-shim.ts'),
+        'data-uri-to-buffer': path.resolve(__dirname, 'src/fetch-shim.ts'),
+      },
+    },
+    server: {
+      // HMR is disabled in AI Studio via DISABLE_HMR env var.
+      // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
+      hmr: process.env.DISABLE_HMR !== 'true',
+    },
+  };
+});

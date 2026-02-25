@@ -1,0 +1,5 @@
+{
+  "name": "Vietjet Air OMC",
+  "description": "Operations Management Center dashboard for real-time airline flight tracking, ground operations, and fleet management.",
+  "requestFramePermissions": ["geolocation"]
+}
