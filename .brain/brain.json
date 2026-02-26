@@ -1,0 +1,181 @@
+{
+  "meta": {
+    "schema_version": "1.1.0",
+    "awf_version": "4.0.2",
+    "last_updated": "2026-02-25T16:15:00+07:00"
+  },
+  "project": {
+    "name": "OE Dashboard",
+    "type": "web-app",
+    "description": "Real-time Operational Excellence Dashboard for VietJet Air, showing flight ops, fleet, crew, weather, alerts, ground ops, and network data",
+    "status": "active-development",
+    "version": "5.0.0"
+  },
+  "tech_stack": {
+    "frontend": {
+      "framework": "React 19",
+      "bundler": "Vite 6.2",
+      "language": "TypeScript 5.8",
+      "styling": "TailwindCSS 4.1 (via @tailwindcss/vite plugin)",
+      "icons": "lucide-react",
+      "charts": "recharts",
+      "animations": "motion (Framer Motion)",
+      "utilities": ["clsx", "tailwind-merge", "date-fns"]
+    },
+    "backend": {
+      "database": "Supabase (PostgreSQL)",
+      "client": "@supabase/supabase-js 2.97",
+      "auth": "Supabase anon key (RLS)",
+      "realtime": "Supabase Realtime (postgres_changes)"
+    },
+    "data_source": {
+      "primary": "AIMS API (airline crew/flight management system)",
+      "sync": "Python ETL scripts (separate repo) sync AIMS → Supabase",
+      "operational_day": "04:00 local → 03:59 next day local"
+    },
+    "deployment": {
+      "hosting": "Local dev (Vite)",
+      "tunnel": "Cloudflare Tunnel for remote access"
+    }
+  },
+  "database_schema": {
+    "summary": "Dashboard reads from Supabase tables synced by AIMS. 5 existing tables from ETL + 3 new tables for dashboard-specific data",
+    "existing_tables": [
+      {
+        "name": "flights",
+        "purpose": "All flight legs",
+        "key_columns": "id(int PK), flight_date(date), carrier_code, flight_number(int), departure, arrival, std, sta, atd, ata, aircraft_reg, status, delay_code, delay_minutes"
+      },
+      {
+        "name": "airports",
+        "purpose": "Airport reference data",
+        "key_columns": "id(int PK), code, name, country_code, latitude, longitude"
+      },
+      {
+        "name": "aircraft",
+        "purpose": "Fleet registry",
+        "key_columns": "id(int PK), registration, aircraft_type, serial_number, country"
+      },
+      {
+        "name": "crew_members",
+        "purpose": "Crew personnel",
+        "key_columns": "id(int PK), crew_id, crew_name, base, email"
+      },
+      {
+        "name": "crew_flight_hours",
+        "purpose": "FTL tracking per crew",
+        "key_columns": "id(int PK), crew_id, calculation_date, hours_28_day, hours_12_month, warning_level"
+      },
+      {
+        "name": "crew_roster",
+        "purpose": "Daily duty assignments",
+        "key_columns": "id(int PK), crew_id, duty_date, duty_code, flight_number"
+      },
+      {
+        "name": "crew_qualifications",
+        "purpose": "Crew type ratings and positions"
+      },
+      {
+        "name": "crew_pairings",
+        "purpose": "Crew pairing assignments"
+      },
+      {
+        "name": "aircraft_swaps",
+        "purpose": "Aircraft swap tracking"
+      },
+      {
+        "name": "sync_logs",
+        "purpose": "ETL sync status logging"
+      }
+    ],
+    "new_tables": [
+      {
+        "name": "alerts",
+        "purpose": "Operational alerts (AOG, crew, weather, ground, tech)",
+        "key_columns": "id(uuid PK), severity, category, flight_id(int FK), title, status"
+      },
+      {
+        "name": "weather_reports",
+        "purpose": "Airport weather + SIGMET data",
+        "key_columns": "id(uuid PK), airport_code, condition, temperature_c, wind_speed_kts, visibility_m, severity, sigmet_id"
+      },
+      {
+        "name": "ground_ops_metrics",
+        "purpose": "Ground handling stage times per airport",
+        "key_columns": "id(uuid PK), airport_code, stage, avg_time_minutes, status"
+      }
+    ],
+    "views": [
+      "v_flights_today (existing) - today's flight summary",
+      "v_crew_current_status (existing) - crew duty status",
+      "v_ftl_warnings (existing) - FTL warning list",
+      "view_dashboard_kpis (new) - aggregated KPIs",
+      "view_airport_otp (new) - per-airport OTP",
+      "view_fleet_summary (new) - fleet counts"
+    ],
+    "gotchas": [
+      "flights.id is INTEGER, not UUID or TEXT",
+      "flights.flight_date is DATE type, not TEXT — use CURRENT_DATE not CURRENT_DATE::TEXT",
+      "flights uses departure/arrival (not dep_airport/arr_airport)",
+      "airports has no 'city' column — use 'name' instead",
+      "aircraft has no 'status' or 'utilization' columns — only registry data",
+      "Supabase has 1000-row limit per query — use .range() pagination for large datasets",
+      "Supabase in_() filter has ~300 item limit"
+    ]
+  },
+  "frontend_architecture": {
+    "entry": "src/main.tsx → src/App.tsx",
+    "views": [
+      "DashboardView - KPIs, flight list, airport OTP, alerts",
+      "FlightDetailView - single flight deep-dive with timeline",
+      "FleetView - aircraft registry and fleet composition",
+      "NetworkView - airborne map, sectors, flight tracker",
+      "AlertsView - alert feed with search/filter/acknowledge",
+      "WeatherView - airport weather & SIGMET",
+      "GroundOpsView - ground handling stage matrix"
+    ],
+    "hooks": [
+      "useDashboard - KPIs + today's flights + alerts + weather + airport OTP",
+      "useFlightDetail - single flight by carrier_code+flight_number",
+      "useFleet - aircraft list + fleet summary view",
+      "useNetwork - today's flights for network map"
+    ],
+    "shared": [
+      "src/lib/supabaseClient.ts - Supabase client singleton",
+      "src/types/database.ts - all TypeScript interfaces",
+      "src/components/ui/LoadingSpinner.tsx - loading/error components",
+      "src/utils.ts - cn() utility"
+    ]
+  },
+  "api_endpoints": [
+    {
+      "path": "Supabase REST API (PostgREST)",
+      "explained": "All data access goes through Supabase client — no custom backend API. Tables accessed: flights, airports, aircraft, alerts, weather_reports, ground_ops_metrics, plus SQL views."
+    }
+  ],
+  "business_rules": [
+    "On-time = delay ≤ 15 minutes",
+    "Operational day = 04:00 local → 03:59 local next day",
+    "Flight display format: carrier_code + flight_number (e.g., VJ126)",
+    "Alert severity: critical > major > minor",
+    "Ground ops stages: CHECK-IN, SECURITY, BOARDING, LOADING, FUELING, CATERING, CLEANING"
+  ],
+  "knowledge_items": {
+    "patterns": [
+      "All hooks follow pattern: fetchData + useState + useEffect + realtime subscription",
+      "Views render LoadingSpinner/ErrorMessage for loading/error states",
+      "Dark theme with #211112 backgrounds, #db1f25 VietJet red accent"
+    ],
+    "gotchas": [
+      "import.meta.env needs (import.meta as any).env cast for tsc",
+      "Object.values() loses type info — use explicit Record<> type",
+      "React sub-components need React.FC typing for key prop to work",
+      "PowerShell needs -ExecutionPolicy Bypass for npm commands"
+    ],
+    "conventions": [
+      "File naming: PascalCase for components, camelCase for hooks",
+      "Supabase env vars: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY",
+      "Colors: VietJet red #db1f25, dark bg #211112, emerald for success"
+    ]
+  }
+}
